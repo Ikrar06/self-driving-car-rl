@@ -6,28 +6,33 @@ window:
   height: 700
   fps: 60
 
-# Car physics (optimized for learning)
+# Car physics (optimized for learning with intelligent speed control)
 car:
-  width: 20  # Smaller car for easier maneuvering
+  width: 30  # Smaller car for easier maneuvering
   height: 15  # Smaller car
-  max_velocity: 4.0  # Slower for better control
+  max_velocity: 40.0  # Maximum speed (auto-adjusted based on turns/obstacles)
   min_velocity: -1.0  # Slower reverse
-  acceleration: 0.2  # Gentler acceleration
-  friction: 0.94  # More friction for better control
-  turn_rate: 0.12  # Faster turning to navigate tight spaces
+  acceleration: 0.25  # Acceleration rate (auto speed control uses this)
+  friction: 0.95  # Friction (auto speed control manages braking)
+  turn_rate: 0.08  # Smooth turning for realistic steering
+  angular_damping: 0.85  # Damping for smooth steering (0.0=instant, 1.0=no damping)
+  # Note: Pure self-learning mode - NO intelligent assists!
+  # Agent learns EVERYTHING: steering, speed control, braking
+  # Smooth steering: car turns gradually like real car (not instant snapping)
 
 # Sensors
 sensors:
-  num_sensors: 5
-  angles: [-60, -30, 0, 30, 60]  # degrees relative to car heading
-  max_range: 200  # pixels
+  num_sensors: 7
+  angles: [-90, -60, -30, 0, 30, 60, 90]  # degrees relative to car heading
+  max_range: 350  # pixels
   render_rays: true
 
 # Rewards (optimized for learning - BALANCED!)
 rewards:
-  survival: 10.0  # Increased from 1.0 to balance penalties
-  checkpoint: 200.0  # Increased from 100.0 - BIG reward for progress!
-  crash: -50.0  # Increased penalty for crash
+  survival: 2.0  # Increased from 1.0 to balance penalties
+  checkpoint: 500.0  # Increased from 100.0 - BIG reward for progress!
+  crash: -2000.0  # Increased penalty for crash
+  finish: 1000.0  # Base reward for completing the lap
   # Reward shaping now handled in simulation.py:
   # - Wall proximity penalty (BALANCED - not too extreme)
   # - Red sensor turning rewards (clear but proportional)
@@ -35,9 +40,26 @@ rewards:
   # - Speed bonus (only when safe)
   # - Distance traveled reward
 
+# Finish time bonus (encourages faster lap times)
+finish_time:
+  enabled: true  # Enable/disable time-based rewards
+  mode: "speed_based"  # "speed_based" or "target_based"
+
+  # SPEED_BASED MODE (recommended): Semakin cepat = semakin banyak reward
+  # Formula: reward = (max_time - actual_time) × multiplier
+  # Example: max=60s, finish di 25s → bonus = (60-25)×50 = 1750
+  max_time: 60.0  # Maximum expected time (slowest acceptable finish)
+  speed_multiplier: 50.0  # Reward per second saved
+
+  # TARGET_BASED MODE: Ada target ideal, lebih cepat=bonus, lebih lambat=penalty
+  # Formula: if time<target → +(target-time)×bonus_mult, else → -(time-target)×penalty_mult
+  target_time: 30.0  # Target lap time in seconds
+  bonus_multiplier: 50.0  # Bonus for finishing under target
+  penalty_multiplier: 10.0  # Penalty for finishing over target
+
 # Episode settings
 episode:
-  max_steps: 1000
+  max_steps: 5000
   start_position: [150, 250]
   start_angle: 0  # radians
 
@@ -47,3 +69,36 @@ rendering:
   show_checkpoints: true
   show_info_panel: true
   trail_length: 50  # Show last N positions
+  show_trail: true  # Show position trail
+  trail_color: [100, 100, 255]  # RGB color for trail
+  sensor_color: [0, 255, 0]  # Green for sensors
+  sensor_hit_color: [255, 0, 0]  # Red when sensor detects wall
+
+# Physics (timing)
+physics:
+  dt: 0.016  # Time step (1/60 seconds at 60 FPS)
+  use_realistic_physics: true  # Use realistic car physics vs arcade
+
+# State space configuration
+state:
+  # State vector = [sensor_1, ..., sensor_N, velocity]
+  # Sensors are normalized to [0, 1]
+  # Velocity is normalized to [0, 1] based on min/max velocity
+  normalize_state: true
+  include_position: false  # If true, add x, y to state (for debugging)
+  include_angle: false  # If true, add angle to state
+
+# Action space (9 discrete actions = 3 steering × 3 speed)
+actions:
+  type: "discrete"  # "discrete" or "continuous"
+  num_actions: 9
+  discrete_actions:
+    - "LEFT_SLOW"       # 0: Turn left + slow speed
+    - "LEFT_NORMAL"     # 1: Turn left + normal speed
+    - "LEFT_FAST"       # 2: Turn left + fast speed
+    - "STRAIGHT_SLOW"   # 3: Go straight + slow speed
+    - "STRAIGHT_NORMAL" # 4: Go straight + normal speed
+    - "STRAIGHT_FAST"   # 5: Go straight + fast speed
+    - "RIGHT_SLOW"      # 6: Turn right + slow speed
+    - "RIGHT_NORMAL"    # 7: Turn right + normal speed
+    - "RIGHT_FAST"      # 8: Turn right + fast speed

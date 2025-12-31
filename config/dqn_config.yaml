@@ -2,14 +2,16 @@
 
 # Network Architecture (OPTIMIZED)
 network:
-  state_dim: 8  # 7 sensors + 1 velocity (UPGRADED!)
-  action_dim: 3  # LEFT, STRAIGHT, RIGHT
+  # state_dim and action_dim automatically loaded from environment.yaml
+  # state_dim = num_sensors + 1 (velocity) = 7 + 1 = 8
+  # action_dim = 9 (3 steering × 3 speed levels)
+  #   Actions: LEFT/STRAIGHT/RIGHT × SLOW/NORMAL/FAST
   hidden_dims: [128, 128]  # Increased from [64, 64] for more capacity
 
 # Training (OPTIMIZED)
 training:
   num_episodes: 1000
-  max_steps_per_episode: 1000
+  max_steps_per_episode: 5000
   batch_size: 64
   learning_rate: 0.0005  # Reduced from 0.001 for stability
   gamma: 0.99  # Discount factor
