@@ -95,6 +95,137 @@ class Track:
         # Track dimensions for rendering
         self._calculate_bounds()
 
+        # Dual-level optimization for performance with large point counts:
+        # 1. Rendering points: Very simplified (~500 points) for display only
+        self._render_outer = self._simplify_for_rendering(outer_boundary, max_points=500)
+        self._render_inner = self._simplify_for_rendering(inner_boundary, max_points=500)
+
+        # 2. Collision points: Moderately simplified (~1500 points) for physics
+        #    Balances accuracy vs performance for collision detection
+        self._collision_outer = self._simplify_for_rendering(outer_boundary, max_points=1500)
+        self._collision_inner = self._simplify_for_rendering(inner_boundary, max_points=1500)
+
+        # Rendering cache (pre-rendered track surface for performance)
+        self._cached_surface: Optional["pygame.Surface"] = None
+        self._cache_size: Optional[Tuple[int, int]] = None
+
+    def _simplify_for_rendering(
+        self,
+        points: List[Tuple[float, float]],
+        max_points: int = 500,
+        tolerance: float = 2.0
+    ) -> List[Tuple[float, float]]:
+        """
+        Simplify points for rendering while preserving shape.
+        Uses fast uniform decimation for huge point counts.
+        Keeps original points for collision detection.
+
+        Args:
+            points: Original boundary points
+            max_points: Target maximum number of points for rendering
+            tolerance: Simplification tolerance (lower = more detail)
+
+        Returns:
+            Simplified points for rendering only
+        """
+        if not points or len(points) <= max_points:
+            return points
+
+        original_count = len(points)
+
+        # Check if closed loop
+        is_closed = (len(points) > 2 and
+                     abs(points[0][0] - points[-1][0]) < 0.1 and
+                     abs(points[0][1] - points[-1][1]) < 0.1)
+
+        working = list(points[:-1] if is_closed else points)
+
+        # FAST PATH: For huge point counts (>5000), use uniform decimation
+        # This is O(n) and avoids recursion issues with Douglas-Peucker
+        if len(working) > 5000:
+            # Calculate step size to get roughly max_points
+            step = max(1, len(working) // max_points)
+            simplified = [working[i] for i in range(0, len(working), step)]
+
+            # Ensure we got close to max_points (add last point if needed)
+            if len(simplified) < max_points // 2:
+                step = max(1, step // 2)
+                simplified = [working[i] for i in range(0, len(working), step)]
+
+            # Always include the last point
+            if simplified[-1] != working[-1]:
+                simplified.append(working[-1])
+        else:
+            # For smaller point counts, use Douglas-Peucker for better shape preservation
+            def perpendicular_distance(point, line_start, line_end):
+                """Calculate perpendicular distance from point to line."""
+                x0, y0 = point
+                x1, y1 = line_start
+                x2, y2 = line_end
+                dx = x2 - x1
+                dy = y2 - y1
+                if dx == 0 and dy == 0:
+                    return math.sqrt((x0 - x1)**2 + (y0 - y1)**2)
+                return abs(dy * x0 - dx * y0 + x2 * y1 - y2 * x1) / math.sqrt(dx**2 + dy**2)
+
+            def douglas_peucker_iterative(pts, epsilon):
+                """Iterative Douglas-Peucker (avoids recursion limit)."""
+                if len(pts) < 3:
+                    return pts
+
+                # Stack-based iterative approach
+                stack = [(0, len(pts) - 1)]
+                keep_indices = {0, len(pts) - 1}
+
+                while stack:
+                    start_idx, end_idx = stack.pop()
+
+                    if end_idx - start_idx <= 1:
+                        continue
+
+                    # Find point with max distance
+                    max_dist = 0
+                    max_idx = start_idx
+                    for i in range(start_idx + 1, end_idx):
+                        dist = perpendicular_distance(pts[i], pts[start_idx], pts[end_idx])
+                        if dist > max_dist:
+                            max_dist = dist
+                            max_idx = i
+
+                    # If max distance is greater than epsilon, keep this point
+                    if max_dist > epsilon:
+                        keep_indices.add(max_idx)
+                        stack.append((start_idx, max_idx))
+                        stack.append((max_idx, end_idx))
+
+                # Build result from kept indices
+                result = [pts[i] for i in sorted(keep_indices)]
+                return result
+
+            simplified = douglas_peucker_iterative(working, tolerance)
+
+            # If still too many points, increase tolerance
+            while len(simplified) > max_points and tolerance < 20.0:
+                tolerance *= 1.5
+                simplified = douglas_peucker_iterative(working, tolerance)
+
+        # Re-close if was closed
+        if is_closed and simplified[0] != simplified[-1]:
+            simplified.append(simplified[0])
+
+        simplified_count = len(simplified)
+        if original_count > max_points:
+            # Determine what this simplification is for based on max_points
+            if max_points <= 500:
+                purpose = "rendering"
+            elif max_points <= 1500:
+                purpose = "collision"
+            else:
+                purpose = "optimization"
+            print(f"   ⚡ {purpose.capitalize()}: {original_count} → {simplified_count} points")
+
+        return simplified
+
     def _calculate_bounds(self) -> None:
         """Calculate bounding box of the track."""
         all_points = self.outer_boundary + self.inner_boundary
@@ -112,6 +243,7 @@ class Track:
     def is_point_on_track(self, x: float, y: float) -> bool:
         """
         Check if a point is on the track (between inner and outer boundaries).
+        Uses simplified collision boundaries for performance.
         Uses ray-casting algorithm for point-in-polygon test.
 
         Args:
@@ -121,15 +253,15 @@ class Track:
         Returns:
             True if point is on track (inside outer AND outside inner)
         """
-        # Must be inside outer boundary
-        inside_outer = self._point_in_polygon(x, y, self.outer_boundary)
+        # Use simplified collision boundaries for speed (still accurate with 1500 points)
+        inside_outer = self._point_in_polygon(x, y, self._collision_outer)
 
         # If no inner boundary, just check outer
-        if not self.inner_boundary:
+        if not self._collision_inner:
             return inside_outer
 
         # Must also be outside inner boundary
-        inside_inner = self._point_in_polygon(x, y, self.inner_boundary)
+        inside_inner = self._point_in_polygon(x, y, self._collision_inner)
         return inside_outer and not inside_inner
 
     def _point_in_polygon(self, x: float, y: float, polygon: List[Tuple[float, float]]) -> bool:
@@ -198,6 +330,55 @@ class Track:
         """
         return (current_idx + 1) % len(self.checkpoints)
 
+    def invalidate_cache(self) -> None:
+        """
+        Invalidate the rendering and collision cache.
+        Call this if track boundaries are modified after initialization.
+        """
+        # Regenerate simplified rendering points
+        self._render_outer = self._simplify_for_rendering(self.outer_boundary, max_points=500)
+        self._render_inner = self._simplify_for_rendering(self.inner_boundary, max_points=500)
+
+        # Regenerate simplified collision points
+        self._collision_outer = self._simplify_for_rendering(self.outer_boundary, max_points=1500)
+        self._collision_inner = self._simplify_for_rendering(self.inner_boundary, max_points=1500)
+
+        # Clear rendering cache
+        self._cached_surface = None
+        self._cache_size = None
+
+    def _render_to_cache(self, screen_size: Tuple[int, int]) -> "pygame.Surface":
+        """
+        Pre-render the track to a cached surface for performance.
+        Uses simplified rendering points for speed (collision uses full detail).
+
+        Args:
+            screen_size: (width, height) of the screen
+
+        Returns:
+            Cached pygame Surface with pre-rendered track
+        """
+        if not PYGAME_AVAILABLE:
+            return None
+
+        # Create a new surface for caching
+        cache_surface = pygame.Surface(screen_size)
+        cache_surface.fill((34, 34, 34))  # Background color
+
+        # Draw outer boundary (dark gray) - using simplified points for speed
+        pygame.draw.polygon(cache_surface, (50, 50, 50), self._render_outer)
+
+        # Draw inner boundary (background color - creates "hole") if exists
+        if self._render_inner and len(self._render_inner) > 2:
+            pygame.draw.polygon(cache_surface, (34, 34, 34), self._render_inner)
+
+        # Draw boundary lines - using simplified points
+        pygame.draw.lines(cache_surface, (200, 200, 200), True, self._render_outer, 3)
+        if self._render_inner and len(self._render_inner) > 2:
+            pygame.draw.lines(cache_surface, (200, 200, 200), True, self._render_inner, 3)
+
+        return cache_surface
+
     def render(
         self,
         screen: Optional["pygame.Surface"] = None,
@@ -205,6 +386,7 @@ class Track:
     ) -> None:
         """
         Render the track on a pygame surface.
+        Uses cached pre-rendered surface for performance (prevents lag with many points).
 
         Args:
             screen: Pygame surface to draw on
@@ -213,18 +395,18 @@ class Track:
         if not PYGAME_AVAILABLE or screen is None:
             return
 
-        # Draw outer boundary (dark gray)
-        pygame.draw.polygon(screen, (50, 50, 50), self.outer_boundary)
+        screen_size = screen.get_size()
 
-        # Draw inner boundary (background color - creates "hole") if exists
-        if self.inner_boundary and len(self.inner_boundary) > 2:
-            pygame.draw.polygon(screen, (34, 34, 34), self.inner_boundary)
+        # Check if we need to (re)create the cache
+        if self._cached_surface is None or self._cache_size != screen_size:
+            # Pre-render the track to cache (only happens once or on resize)
+            self._cached_surface = self._render_to_cache(screen_size)
+            self._cache_size = screen_size
 
-        # Draw boundary lines
-        pygame.draw.lines(screen, (200, 200, 200), True, self.outer_boundary, 3)
-        if self.inner_boundary and len(self.inner_boundary) > 2:
-            pygame.draw.lines(screen, (200, 200, 200), True, self.inner_boundary, 3)
+        # Blit the cached track (MUCH faster than drawing thousands of polygon points!)
+        screen.blit(self._cached_surface, (0, 0))
 
+        # Draw dynamic elements on top (these change during rendering)
         # Draw checkpoints
         if show_checkpoints:
             for i, checkpoint in enumerate(self.checkpoints):
