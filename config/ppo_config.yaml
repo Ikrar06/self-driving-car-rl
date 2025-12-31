@@ -1,0 +1,49 @@
+# PPO Configuration
+
+# Network Architecture
+network:
+  # state_dim and action_dim automatically loaded from environment.yaml
+  # state_dim = num_sensors + 1 (velocity) = 7 + 1 = 8
+  # action_dim = 9 (3 steering × 3 speed levels)
+  #   Actions: LEFT/STRAIGHT/RIGHT × SLOW/NORMAL/FAST
+  hidden_dims: [128, 128]  # Shared feature extractor
+  continuous_actions: false  # Use discrete actions (matching DQN)
+
+# Training
+training:
+  num_episodes: 1000
+  max_steps_per_episode: 5000
+  trajectory_length: 2048  # Steps before policy update
+  update_epochs: 10  # Number of epochs per update
+  batch_size: 64  # Mini-batch size for updates
+  learning_rate: 0.0003  # 3e-4 is standard for PPO
+  gamma: 0.99  # Discount factor
+
+  # Device (auto-detect MPS for Apple Silicon)
+  device: null  # Auto-detect (null), or specify: "mps", "cuda", "cpu"
+
+# PPO-specific parameters
+ppo:
+  gae_lambda: 0.95  # GAE lambda for advantage estimation
+  clip_epsilon: 0.2  # PPO clipping parameter
+  value_coef: 0.5  # Value loss coefficient
+  entropy_coef: 0.01  # Entropy bonus coefficient (exploration)
+  max_grad_norm: 0.5  # Gradient clipping for stability
+
+# Checkpointing
+checkpoint:
+  save_freq: 50  # Save model every N episodes
+  save_dir: "models/checkpoints/ppo"
+  keep_best: true  # Keep best model based on reward
+
+# Logging
+logging:
+  log_freq: 10  # Log metrics every N episodes
+  tensorboard_dir: "logs/tensorboard/ppo"
+  verbose: true
+
+# Evaluation
+evaluation:
+  eval_freq: 50  # Evaluate every N episodes
+  eval_episodes: 5  # Number of episodes to evaluate
+  render_eval: true  # Render during evaluation
