@@ -23,7 +23,7 @@ class RaySensor:
     def __init__(
         self,
         angle_offset: float,
-        max_range: float = 200.0,
+        max_range: float = 500.0,
     ):
         """
         Initialize a ray sensor.
@@ -198,26 +198,43 @@ class SensorArray:
             if sensor.hit_point is None:
                 continue
 
-            # Color based on distance (green=safe, yellow=warn, red=danger)
+            # Color based on distance (6-level gradient)
+            # normalized: 0.0 = far from wall (safe), 1.0 = close to wall (danger)
             normalized = sensor.get_normalized_reading()
 
-            if normalized < 0.2:
-                # Safe (far from wall)
-                color = (76, 175, 80)  # Green
-            elif normalized < 0.8:
-                # Warning (getting close)
-                color = (255, 193, 7)  # Yellow
-            else:
-                # Danger (very close to wall)
+            # Gradient: Green (safe/far) → Red (danger/close)
+            if normalized > 0.85:
+                # CRITICAL - Very close to wall
+                color = (211, 47, 47)  # Dark Red
+                line_width = 3
+            elif normalized > 0.7:
+                # DANGER - Close to wall
                 color = (244, 67, 54)  # Red
+                line_width = 3
+            elif normalized > 0.55:
+                # WARNING - Getting close
+                color = (255, 152, 0)  # Orange
+                line_width = 2
+            elif normalized > 0.4:
+                # CAUTION - Moderate distance
+                color = (255, 193, 7)  # Yellow
+                line_width = 2
+            elif normalized > 0.2:
+                # SAFE - Good distance
+                color = (139, 195, 74)  # Light Green
+                line_width = 1
+            else:
+                # CLEAR - Far from wall
+                color = (76, 175, 80)  # Green
+                line_width = 1
 
-            # Draw line from car to hit point
+            # Draw line from car to hit point (thicker when closer to obstacles)
             pygame.draw.line(
                 screen,
                 color,
                 (int(car_x), int(car_y)),
                 (int(sensor.hit_point[0]), int(sensor.hit_point[1])),
-                2,
+                line_width,
             )
 
             # Draw small circle at hit point
@@ -246,18 +263,27 @@ class SensorArray:
 
 
 # Helper function for easy sensor creation
-def create_default_sensors(max_range: float = 200.0) -> SensorArray:
+def create_default_sensors(
+    num_sensors: int = 7,
+    angles: list = None,
+    max_range: float = 1000.0
+) -> SensorArray:
     """
-    Create default 7-sensor array with wide coverage.
+    Create sensor array with configurable parameters.
 
     Args:
+        num_sensors: Number of sensors
+        angles: List of sensor angles in degrees (if None, uses default 7-sensor config)
         max_range: Maximum detection range
 
     Returns:
-        SensorArray with 7 sensors at -90, -60, -30, 0, +30, +60, +90 degrees
+        SensorArray with specified configuration
     """
+    if angles is None:
+        angles = [-90, -60, -30, 0, 30, 60, 90]
+
     return SensorArray(
-        num_sensors=7,
-        angles=[-90, -60, -30, 0, 30, 60, 90],
+        num_sensors=num_sensors,
+        angles=angles,
         max_range=max_range,
     )
