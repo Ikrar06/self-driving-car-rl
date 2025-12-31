@@ -303,9 +303,6 @@ which python  # Should show ./venv/bin/python
 - [ ] Multi-agent racing
 - [ ] Curriculum learning
 
-## License
-
-MIT License - see [LICENSE](LICENSE) file
 
 ## Contributing
 

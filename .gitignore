@@ -56,9 +56,19 @@ models/checkpoints/*.pt
 *.ipynb
 
 # Temporary files
-test_car_manual.py
 tmp/
 temp/
+
+# Development test scripts (not for production)
+test_car_manual.py
+test_dqn_manual.py
+test_environment_manual.py
+test_reward_function.py
+test_sensor_manual.py
+test_track_manual.py
+diagnose_agent.py
+train_f1_slow_visual.py
+train_oval_visualized.py
 
 # Test tracks (auto-generated from track builder)
 tracks/test_save_load*.json
