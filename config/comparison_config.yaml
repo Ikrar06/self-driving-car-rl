@@ -1,0 +1,77 @@
+# Comparison Training Configuration
+# For side-by-side DQN vs PPO training
+
+# General settings
+general:
+  track: "tracks/supercool_track.json"  # Track to use
+  num_episodes: 300  # Number of episodes per agent
+  render_update_freq: 5  # Update rendering every N steps
+  fps: 60  # Target FPS for visualization (60 for smoother, 30 for lower CPU)
+
+# Agent 1: DQN
+agent1:
+  type: "DQN"
+  name: "DQN"
+  config:
+    # state_dim and action_dim automatically loaded from environment.yaml
+    # state_dim = 8 (7 sensors + velocity)
+    # action_dim = 9 (3 steering × 3 speed)
+    hidden_dims: [128, 128]
+    learning_rate: 0.0005
+    gamma: 0.99
+    epsilon_start: 1.0
+    epsilon_end: 0.1
+    epsilon_decay: 0.9985
+    buffer_size: 20000
+    batch_size: 64
+    target_update_freq: 200
+    device: null  # Auto-detect
+    double_dqn: true
+
+# Agent 2: PPO
+agent2:
+  type: "PPO"
+  name: "PPO"
+  config:
+    # state_dim and action_dim automatically loaded from environment.yaml
+    # state_dim = 8 (7 sensors + velocity)
+    # action_dim = 9 (3 steering × 3 speed)
+    hidden_dims: [128, 128]
+    learning_rate: 0.0003
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_epsilon: 0.2
+    value_coef: 0.5
+    entropy_coef: 0.01
+    max_grad_norm: 0.5
+    update_epochs: 10
+    batch_size: 64
+    trajectory_length: 2048
+    device: null  # Auto-detect
+    continuous_actions: false
+
+# Visualization
+visualization:
+  enabled: true  # Enable visual rendering
+  window_width: 2000
+  window_height: 700
+  fullscreen: false  # Start in windowed mode
+  show_comparison_panel: true
+
+# Logging & Checkpointing
+logging:
+  tensorboard_dir: "logs/tensorboard/comparison"
+  log_freq: 10  # Log every N episodes
+  verbose: true
+  save_metrics_csv: true  # Save metrics to CSV
+
+checkpoint:
+  save_freq: 50  # Save every N episodes
+  save_dir: "models/checkpoints/comparison"
+  save_both_agents: true
+
+# Metrics
+metrics:
+  track_convergence: true
+  track_sample_efficiency: true
+  export_comparison_stats: true
