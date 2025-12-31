@@ -1,0 +1,52 @@
+# DQN Configuration
+
+# Network Architecture (OPTIMIZED)
+network:
+  state_dim: 8  # 7 sensors + 1 velocity (UPGRADED!)
+  action_dim: 3  # LEFT, STRAIGHT, RIGHT
+  hidden_dims: [128, 128]  # Increased from [64, 64] for more capacity
+
+# Training (OPTIMIZED)
+training:
+  num_episodes: 1000
+  max_steps_per_episode: 1000
+  batch_size: 64
+  learning_rate: 0.0005  # Reduced from 0.001 for stability
+  gamma: 0.99  # Discount factor
+  double_dqn: true  # Enable Double DQN for better Q-value estimates
+
+  # Device (auto-detect MPS for Apple Silicon)
+  device: null  # Auto-detect (null), or specify: "mps", "cuda", "cpu"
+
+# Exploration (CRITICAL FIX - agent needs to learn turning!)
+exploration:
+  epsilon_start: 1.0
+  epsilon_end: 0.1  # Keep exploration high - agent must try turning
+  epsilon_decay: 0.9985  # Much slower decay for extensive exploration
+
+# Experience Replay (OPTIMIZED)
+replay:
+  buffer_size: 20000  # Increased from 10000 for more diverse experiences
+  min_size: 200  # Start learning quickly with new reward signals
+
+# Target Network (OPTIMIZED)
+target_network:
+  update_freq: 200  # Increased from 100 for more stable learning
+
+# Checkpointing
+checkpoint:
+  save_freq: 50  # Save model every N episodes
+  save_dir: "models/checkpoints/dqn"
+  keep_best: true  # Keep best model based on reward
+
+# Logging
+logging:
+  log_freq: 10  # Log metrics every N episodes
+  tensorboard_dir: "logs/tensorboard/dqn"
+  verbose: true
+
+# Evaluation
+evaluation:
+  eval_freq: 50  # Evaluate every N episodes
+  eval_episodes: 5  # Number of episodes to evaluate
+  render_eval: true  # Render during evaluation

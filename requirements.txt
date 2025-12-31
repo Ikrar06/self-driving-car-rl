@@ -1,0 +1,26 @@
+# Self-Driving Car Simulation - Dependencies
+# Optimized for Apple Silicon (M4) with Python 3.14+ support
+
+# Environment & Visualization
+pygame>=2.6.0  # Newer version with Python 3.14 support
+numpy>=1.26.0  # Compatible with Python 3.14
+
+# RL Framework (PyTorch for Apple Silicon with MPS support)
+torch>=2.1.0
+torchvision>=0.16.0
+
+# Monitoring & Logging
+tensorboard>=2.14.0
+tqdm>=4.66.0
+
+# Utilities
+matplotlib>=3.8.0
+pyyaml>=6.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code Quality (optional, recommended)
+black>=23.0.0
+flake8>=6.0.0
