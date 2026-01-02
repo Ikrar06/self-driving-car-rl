@@ -193,11 +193,11 @@ python3 evaluate_model.py --model models/checkpoints/dqn_best.pt --track tracks/
 ```
 
 **Evaluation Metrics:**
-- ✅ **Success Rate** - Percentage of completed laps
-- 📊 **Average Reward** - Mean episode reward
-- ⏱️ **Lap Time** - Average and best lap times
-- 🎯 **Checkpoint Rate** - Percentage of checkpoints collected
-- 📈 **Steps per Episode** - Efficiency metric
+- **Success Rate** - Percentage of completed laps
+- **Average Reward** - Mean episode reward
+- **Lap Time** - Average and best lap times
+- **Checkpoint Rate** - Percentage of checkpoints collected
+- **Steps per Episode** - Efficiency metric
 
 **Camera Controls:**
 - **[Mouse Wheel]** - Zoom in/out (0.3x - 3.0x)
@@ -205,6 +205,248 @@ python3 evaluate_model.py --model models/checkpoints/dqn_best.pt --track tracks/
 - **[Space]** - Toggle follow car mode
 - **[R]** - Reset camera to default
 - **[ESC]** - Exit evaluation
+
+## Training Scripts & Tools Guide
+
+This project provides multiple training scripts and tools for different use cases. Here's when to use each:
+
+### Training Scripts Comparison
+
+| Script | Algorithm | Visualization | Best For | Key Features |
+|--------|-----------|---------------|----------|--------------|
+| [train_ppo.py](train_ppo.py) | PPO | None (headless) | Fast training, production runs | TensorBoard logging, periodic evaluation, checkpoints |
+| [train_with_camera.py](train_with_camera.py) | DQN | Advanced camera | Debugging, track exploration | Zoom, pan, follow car, speedometer, ghost trail |
+| [train_comparison.py](train_comparison.py) | DQN + PPO | Split-screen | Algorithm comparison | Side-by-side DQN vs PPO, dual cameras, real-time metrics |
+| [train_with_ghost.py](train_with_ghost.py) | DQN | Ghost trail | Visualizing improvement | Shows previous episode path, progress comparison |
+| [train_progressive_learning.py](train_progressive_learning.py) | DQN | Ghost trail | Consistent learning | Low epsilon (0.3→0.05), less exploration, stable policy |
+
+### Detailed Script Descriptions
+
+#### 1. train_ppo.py - PPO Headless Training
+**Purpose**: Fast, efficient PPO training without visualization overhead.
+
+**When to use**:
+- Production training runs for best performance
+- Long training sessions (500+ episodes)
+- When you need TensorBoard metrics
+- Server/remote training without display
+
+**Features**:
+- Pure console output with progress bars
+- Automatic evaluation every N episodes
+- TensorBoard logging (policy loss, value loss, entropy, KL divergence)
+- Checkpoint management (best + periodic saves)
+- Trajectory-based learning (2048 steps buffer)
+
+**Example**:
+```bash
+python3 train_ppo.py --track tracks/oval_easy.json --episodes 1000
+# Monitor with: tensorboard --logdir logs/tensorboard/ppo
+```
+
+---
+
+#### 2. train_with_camera.py - DQN with Advanced Camera
+**Purpose**: Interactive training with professional camera controls for detailed observation.
+
+**When to use**:
+- Debugging agent behavior in specific track sections
+- Understanding why agent crashes at certain corners
+- Creating demo videos or screenshots
+- Exploring complex tracks while training
+
+**Features**:
+- **Camera Controls**: Zoom (0.3x-3.0x), pan, follow car mode
+- **Speedometer Panel**: Real-time speed, gas/brake indicators, speed bar
+- **Ghost Trail**: See previous episode's path
+- **Fullscreen Support**: F11 or Cmd+F for fullscreen
+- **Keyboard Controls**: Arrow keys for pan, Space for follow toggle, R for reset
+
+**Example**:
+```bash
+python3 train_with_camera.py --track tracks/f1_spa_style_long.json --episodes 200 --fps 30
+```
+
+**Controls**:
+- Mouse Wheel: Zoom in/out
+- Arrow Keys: Pan camera
+- Space / F: Toggle follow car
+- R: Reset camera
+- F11 / Cmd+F: Fullscreen
+
+---
+
+#### 3. train_comparison.py - DQN vs PPO Split-Screen
+**Purpose**: Direct algorithm comparison with side-by-side visualization.
+
+**When to use**:
+- Comparing DQN vs PPO sample efficiency
+- Testing hyperparameters side-by-side
+- Research and analysis
+- Demonstrating algorithm differences
+
+**Features**:
+- **Split-Screen**: 2000×700 window (1000px per agent)
+- **Independent Cameras**: Separate zoom/pan for each agent
+- **Real-time Metrics**: Episode rewards, checkpoints, steps
+- **Synchronized Environment**: Same track, same conditions
+- **Dual TensorBoard Logs**: Separate logs for each agent
+
+**Example**:
+```bash
+python3 train_comparison.py --track tracks/oval_easy.json --episodes 300 --fps 60
+```
+
+**Controls**:
+- Tab: Switch active camera (left/right/both)
+- 1/2: Focus left/right agent
+- Space: Toggle camera follow
+- Arrow Keys: Pan active camera
+- Mouse Wheel: Zoom active camera
+
+---
+
+#### 4. train_with_ghost.py - DQN with Ghost Visualization
+**Purpose**: Visualize episode-to-episode improvement by showing previous attempt.
+
+**When to use**:
+- Seeing if agent is making progress each episode
+- Visual confirmation of learning
+- Understanding where agent improves vs repeats mistakes
+- Teaching/demonstration purposes
+
+**Features**:
+- **Red Ghost Cars**: Previous episode path rendered as semi-transparent red cars
+- **Current Episode**: Bright colored car for current attempt
+- **Improvement Tracking**: Compare current length vs previous
+- **Visual Learning**: Immediately see if agent goes further than last time
+
+**Example**:
+```bash
+python3 train_with_ghost.py --track tracks/simple_straight.json --episodes 200 --fps 30
+```
+
+**Visual Cues**:
+- Red/Orange Ghosts = Where you crashed last episode
+- Bright Car = Current attempt
+- Goal: Go further than the ghosts!
+
+---
+
+#### 5. train_progressive_learning.py - DQN with Low Epsilon
+**Purpose**: Progressive learning with consistent behavior (low exploration).
+
+**When to use**:
+- Agent already learned basics, needs fine-tuning
+- Want consistent behavior with minimal randomness
+- Incremental improvement on complex tracks
+- After initial exploration phase
+
+**Features**:
+- **Low Epsilon**: Starts at 0.3 (vs normal 1.0)
+- **Slow Decay**: 0.995 decay rate for gradual reduction
+- **Exploitation Focus**: 70% exploitation from start
+- **Ghost Visualization**: Shows previous episode for comparison
+- **Stable Policy**: Less random actions, more predictable behavior
+
+**Example**:
+```bash
+python3 train_progressive_learning.py --track tracks/f1_grand_circuit.json --episodes 200 --fps 20
+```
+
+**Key Difference**: Normal training explores 100% → 10%, this explores 30% → 5%
+
+---
+
+### Utility Tools
+
+#### track_builder.py - Interactive Track Editor
+**Purpose**: Create custom racing tracks with visual editor.
+
+**Features**:
+- Draw outer/inner boundaries with mouse
+- Chaikin's smoothing algorithm for smooth curves
+- Place checkpoints and start position
+- Camera controls (zoom, pan)
+- File save/load with GUI dialog
+- Grid snapping for precision
+
+**Usage**:
+```bash
+python3 track_builder.py
+```
+
+**Full controls documented in**: [Build Custom Tracks](#build-custom-tracks) section above
+
+---
+
+#### view_track.py - Track Layout Viewer
+**Purpose**: Preview track layouts without starting training.
+
+**When to use**:
+- Inspecting track before training
+- Checking checkpoint placement
+- Verifying track validity
+- Getting track coordinates for debugging
+
+**Features**:
+- Static track visualization
+- Checkpoint numbering (CP1, CP2, ...)
+- Start position marker (green circle + cross)
+- Click-to-get-coordinates
+- Mouse position tracking
+- Color legend
+
+**Example**:
+```bash
+python3 view_track.py --track tracks/f1_grand_circuit.json
+```
+
+**Controls**:
+- ESC or Q: Quit
+- Click: Print coordinates to console
+
+---
+
+#### evaluate_model.py - Model Evaluation
+**Purpose**: Test trained models with comprehensive metrics and visualization.
+
+**When to use**:
+- After training completes
+- Testing generalization on different tracks
+- Generating performance reports
+- Comparing model checkpoints
+
+**Features**:
+- **Auto-detection**: Automatically detects DQN vs PPO from checkpoint
+- **Visualization**: Full camera controls (zoom, pan, follow)
+- **Comprehensive Metrics**: Success rate, avg reward, lap times, checkpoints
+- **Export Options**: CSV and JSON output
+- **Deterministic Evaluation**: Pure exploitation (epsilon=0)
+
+**Full usage documented in**: [Evaluate Trained Models](#evaluate-trained-models) section above
+
+---
+
+### Quick Selection Guide
+
+**Choose your script based on your goal:**
+
+**I want the fastest training** → `train_ppo.py` (headless, TensorBoard)
+
+**I want to watch and debug** → `train_with_camera.py` (zoom, pan, speedometer)
+
+**I want to compare algorithms** → `train_comparison.py` (DQN vs PPO split-screen)
+
+**I want to see improvement visually** → `train_with_ghost.py` (ghost trails)
+
+**I want consistent learning** → `train_progressive_learning.py` (low epsilon)
+
+**I want to create tracks** → `track_builder.py` (interactive editor)
+
+**I want to preview a track** → `view_track.py` (static viewer)
+
+**I want to test a trained model** → `evaluate_model.py` (metrics + export)
 
 ## Project Structure
 
