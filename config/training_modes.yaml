@@ -1,0 +1,289 @@
+# ============================================================================
+# Universal Training Configuration
+# All training modes in one file with separate sections
+# ============================================================================
+
+# ============================================================================
+# SHARED CONFIGURATION (Used by all modes)
+# ============================================================================
+shared:
+  # Network Architecture
+  network:
+    state_dim: 8  # 7 sensors + velocity
+    action_dim: 9  # 3 steering × 3 speed
+    hidden_dims: [128, 128]
+
+  # Common Training Parameters
+  training:
+    max_steps_per_episode: 5000
+    batch_size: 64
+    learning_rate: 0.0005
+    gamma: 0.99
+    double_dqn: true
+    device: null  # Auto-detect (mps/cuda/cpu)
+
+  # Experience Replay (DQN modes only)
+  replay:
+    buffer_size: 20000
+    min_size: 200
+
+  # Target Network (DQN modes only)
+  target_network:
+    update_freq: 200
+
+  # Logging
+  logging:
+    log_freq: 10
+    verbose: true
+
+# ============================================================================
+# DQN STANDARD MODE
+# Full exploration (1.0 → 0.1) for standard DQN training
+# ============================================================================
+dqn_standard:
+  name: "DQN Standard"
+  description: "Standard DQN with full exploration"
+
+  # Training Settings
+  track: "tracks/oval_easy.json"
+  num_episodes: 1000
+  fps: 60
+
+  # Exploration
+  exploration:
+    epsilon_start: 1.0  # Full exploration
+    epsilon_end: 0.1
+    epsilon_decay: 0.9985
+
+  # Checkpointing
+  checkpoint:
+    save_freq: 50
+    save_dir: "models/checkpoints/dqn"
+    keep_best: true
+
+  # Logging
+  logging:
+    tensorboard_dir: "logs/tensorboard/dqn"
+
+# ============================================================================
+# DQN GHOST MODE
+# Standard exploration with ghost visualization
+# ============================================================================
+dqn_ghost:
+  name: "DQN Ghost Visualization"
+  description: "DQN with previous episode ghost trail"
+
+  # Training Settings
+  track: "tracks/simple_straight.json"
+  num_episodes: 200
+  fps: 30
+
+  # Exploration (standard DQN)
+  exploration:
+    epsilon_start: 1.0
+    epsilon_end: 0.1
+    epsilon_decay: 0.9985
+
+  # Checkpointing
+  checkpoint:
+    save_freq: 50
+    save_dir: "models/checkpoints/ghost"
+    keep_best: true
+
+  # Logging
+  logging:
+    tensorboard_dir: "logs/tensorboard/ghost"
+
+# ============================================================================
+# DQN PROGRESSIVE MODE
+# LOW epsilon (0.3 → 0.05) for consistent, incremental learning
+# ============================================================================
+dqn_progressive:
+  name: "DQN Progressive Learning"
+  description: "DQN with low epsilon for consistent behavior"
+
+  # Training Settings
+  track: "tracks/f1_grand_circuit.json"
+  num_episodes: 200
+  fps: 20
+
+  # Exploration (LOW EPSILON!)
+  exploration:
+    epsilon_start: 0.3  # LOW! Start with 30% exploration
+    epsilon_end: 0.05   # End with 5% exploration
+    epsilon_decay: 0.995  # Slow decay
+
+  # Checkpointing
+  checkpoint:
+    save_freq: 50
+    save_dir: "models/checkpoints/progressive"
+    keep_best: true
+
+  # Logging
+  logging:
+    tensorboard_dir: "logs/tensorboard/progressive"
+
+# ============================================================================
+# DQN CAMERA MODE
+# Low epsilon with advanced camera controls
+# ============================================================================
+dqn_camera:
+  name: "DQN Camera Controls"
+  description: "DQN with zoom, pan, and follow camera"
+
+  # Training Settings
+  track: "tracks/f1_spa_style_long.json"
+  num_episodes: 200
+  fps: 30
+
+  # Exploration (low epsilon)
+  exploration:
+    epsilon_start: 0.3
+    epsilon_end: 0.05
+    epsilon_decay: 0.995
+
+  # Checkpointing
+  checkpoint:
+    save_freq: 50
+    save_dir: "models/checkpoints/camera"
+    keep_best: true
+
+  # Logging
+  logging:
+    tensorboard_dir: "logs/tensorboard/camera"
+
+# ============================================================================
+# PPO MODE
+# Proximal Policy Optimization (headless training)
+# ============================================================================
+ppo:
+  name: "PPO Headless"
+  description: "PPO training without visualization"
+
+  # Training Settings
+  track: "tracks/oval_easy.json"
+  num_episodes: 1000
+  fps: 60
+
+  # PPO-specific Network
+  network:
+    state_dim: 8
+    action_dim: 9
+    hidden_dims: [128, 128]
+    continuous_actions: false
+
+  # PPO-specific Training
+  training:
+    max_steps_per_episode: 5000
+    learning_rate: 0.0003  # Lower than DQN
+    gamma: 0.99
+    trajectory_length: 2048
+    update_epochs: 10
+    batch_size: 64
+    device: null
+
+  # PPO Parameters
+  ppo:
+    gae_lambda: 0.95
+    clip_epsilon: 0.2
+    value_coef: 0.5
+    entropy_coef: 0.01
+    max_grad_norm: 0.5
+
+  # Checkpointing
+  checkpoint:
+    save_freq: 50
+    save_dir: "models/checkpoints/ppo"
+    keep_best: true
+
+  # Logging
+  logging:
+    log_freq: 10
+    tensorboard_dir: "logs/tensorboard/ppo"
+    verbose: true
+
+  # Evaluation
+  evaluation:
+    eval_freq: 50
+    eval_episodes: 5
+    render_eval: true
+
+# ============================================================================
+# COMPARISON MODE
+# Side-by-side DQN vs PPO training
+# ============================================================================
+comparison:
+  name: "DQN vs PPO Comparison"
+  description: "Side-by-side algorithm comparison"
+
+  # General Settings
+  track: "tracks/supercool_track.json"
+  num_episodes: 300
+  render_update_freq: 5
+  fps: 60
+
+  # Visualization
+  visualization:
+    enabled: true
+    window_width: 2000
+    window_height: 700
+    fullscreen: false
+    show_comparison_panel: true
+
+  # Agent 1: DQN
+  agent1:
+    type: "DQN"
+    name: "DQN"
+    config:
+      state_dim: 8
+      action_dim: 9
+      hidden_dims: [128, 128]
+      learning_rate: 0.0005
+      gamma: 0.99
+      epsilon_start: 1.0
+      epsilon_end: 0.1
+      epsilon_decay: 0.9985
+      buffer_size: 20000
+      batch_size: 64
+      target_update_freq: 200
+      device: null
+      double_dqn: true
+
+  # Agent 2: PPO
+  agent2:
+    type: "PPO"
+    name: "PPO"
+    config:
+      state_dim: 8
+      action_dim: 9
+      hidden_dims: [128, 128]
+      learning_rate: 0.0003
+      gamma: 0.99
+      gae_lambda: 0.95
+      clip_epsilon: 0.2
+      value_coef: 0.5
+      entropy_coef: 0.01
+      max_grad_norm: 0.5
+      update_epochs: 10
+      batch_size: 64
+      trajectory_length: 2048
+      device: null
+      continuous_actions: false
+
+  # Logging & Checkpointing
+  logging:
+    tensorboard_dir: "logs/tensorboard/comparison"
+    log_freq: 10
+    verbose: true
+    save_metrics_csv: true
+
+  checkpoint:
+    save_freq: 50
+    save_dir: "models/checkpoints/comparison"
+    save_both_agents: true
+
+  # Metrics
+  metrics:
+    track_convergence: true
+    track_sample_efficiency: true
+    export_comparison_stats: true
