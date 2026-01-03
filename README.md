@@ -478,18 +478,19 @@ self-driving-car-rl/
 │   └── utils/
 │       └── config_loader.py    # Centralized config
 ├── config/
-│   ├── environment.yaml        # Physics, sensors, rewards
-│   ├── dqn_config.yaml        # DQN hyperparameters
-│   ├── ppo_config.yaml        # PPO hyperparameters
-│   └── comparison_config.yaml  # Comparison settings
+│   ├── environment.yaml        # Shared: physics, sensors, rewards
+│   └── training_modes.yaml     # All training modes (DQN, PPO, comparison)
 ├── tracks/
 │   ├── oval_easy.json
 │   ├── megacool_track.json
 │   └── *.json                 # Your custom tracks
 ├── track_builder.py           # Interactive track editor
-├── train_with_camera.py       # DQN training + visualization
-├── train_ppo.py               # PPO standalone training
-├── train_comparison.py        # Side-by-side DQN vs PPO
+├── view_track.py              # Track layout viewer
+├── train_ppo.py               # PPO headless training
+├── train_with_camera.py       # DQN + camera controls
+├── train_comparison.py        # DQN vs PPO side-by-side
+├── train_with_ghost.py        # DQN + ghost visualization
+├── train_progressive_learning.py  # DQN with low epsilon
 ├── evaluate_model.py          # Model evaluation with metrics
 └── requirements.txt
 ```
@@ -531,48 +532,97 @@ finish_time:
   speed_multiplier: 50.0
 ```
 
-### DQN Hyperparameters (`config/dqn_config.yaml`)
+### Training Modes (`config/training_modes.yaml`)
+
+**Universal configuration file** with all training modes in one place. Each script loads its specific section:
 
 ```yaml
-network:
-  hidden_dims: [128, 128]
+# Shared configuration (used by all modes)
+shared:
+  network:
+    state_dim: 8
+    action_dim: 9
+    hidden_dims: [128, 128]
+  training:
+    batch_size: 64
+    learning_rate: 0.0005
+    gamma: 0.99
+    double_dqn: true
 
-training:
+# DQN Standard Mode (epsilon: 1.0 → 0.1)
+dqn_standard:
+  track: "tracks/oval_easy.json"
   num_episodes: 1000
-  learning_rate: 0.0005
-  gamma: 0.99
-  double_dqn: true
+  exploration:
+    epsilon_start: 1.0
+    epsilon_end: 0.1
+    epsilon_decay: 0.9985
 
-exploration:
-  epsilon_start: 1.0
-  epsilon_end: 0.1
-  epsilon_decay: 0.9985
+# DQN Ghost Mode (epsilon: 1.0 → 0.1)
+dqn_ghost:
+  track: "tracks/simple_straight.json"
+  num_episodes: 200
+  exploration:
+    epsilon_start: 1.0
+    epsilon_end: 0.1
 
-replay:
-  buffer_size: 20000
-  batch_size: 64
-```
+# DQN Progressive Mode (epsilon: 0.3 → 0.05 - LOW!)
+dqn_progressive:
+  track: "tracks/f1_grand_circuit.json"
+  num_episodes: 200
+  exploration:
+    epsilon_start: 0.3  # LOW for consistent behavior
+    epsilon_end: 0.05
+    epsilon_decay: 0.995
 
-### PPO Hyperparameters (`config/ppo_config.yaml`)
+# DQN Camera Mode (epsilon: 0.3 → 0.05)
+dqn_camera:
+  track: "tracks/f1_spa_style_long.json"
+  num_episodes: 200
+  exploration:
+    epsilon_start: 0.3
+    epsilon_end: 0.05
 
-```yaml
-network:
-  hidden_dims: [128, 128]
-  continuous_actions: false
-
-training:
-  num_episodes: 1000
-  learning_rate: 0.0003
-  gamma: 0.99
-  trajectory_length: 2048
-  update_epochs: 10
-
+# PPO Mode
 ppo:
-  gae_lambda: 0.95
-  clip_epsilon: 0.2
-  value_coef: 0.5
-  entropy_coef: 0.01
+  track: "tracks/oval_easy.json"
+  num_episodes: 1000
+  ppo:
+    gae_lambda: 0.95
+    clip_epsilon: 0.2
+    trajectory_length: 2048
+
+# Comparison Mode (DQN vs PPO)
+comparison:
+  track: "tracks/supercool_track.json"
+  num_episodes: 300
+  visualization:
+    window_width: 2000
+    window_height: 700
 ```
+
+---
+
+### Training Modes Summary
+
+| Mode | Script | Epsilon | Track | Purpose |
+|------|--------|---------|-------|---------|
+| `dqn_standard` | - | 1.0 → 0.1 | oval_easy.json | Standard DQN training |
+| `dqn_ghost` | train_with_ghost.py | 1.0 → 0.1 | simple_straight.json | Ghost trail visualization |
+| `dqn_progressive` | train_progressive_learning.py | **0.3 → 0.05** | f1_grand_circuit.json | Low epsilon, consistent learning |
+| `dqn_camera` | train_with_camera.py | **0.3 → 0.05** | f1_spa_style_long.json | Camera controls + speedometer |
+| `ppo` | train_ppo.py | - | oval_easy.json | PPO headless training |
+| `comparison` | train_comparison.py | Both | supercool_track.json | DQN vs PPO split-screen |
+
+**How scripts load config:**
+```python
+modes_config = load_config("config/training_modes.yaml")
+mode = modes_config['dqn_ghost']  # or 'dqn_progressive', 'ppo', etc.
+shared = modes_config['shared']   # Shared parameters
+env_config = load_config("config/environment.yaml")
+```
+
+**Note**: All training scripts accept CLI arguments (`--track`, `--episodes`, `--fps`) that override config values.
 
 ## State & Action Space
 
