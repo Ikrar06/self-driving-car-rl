@@ -1,104 +1,143 @@
+# ============================================================================
 # Environment Configuration
+# Shared settings for all training scripts (DQN, PPO, comparison, etc.)
+# ============================================================================
 
-# Window settings
+# ============================================================================
+# WINDOW SETTINGS
+# ============================================================================
 window:
-  width: 1000
-  height: 700
-  fps: 60
+  width: 1000    # Window width in pixels
+  height: 700    # Window height in pixels
+  fps: 60        # Target frames per second
 
-# Car physics (optimized for learning with intelligent speed control)
+# ============================================================================
+# CAR PHYSICS
+# Agent learns FULL control: steering, speed, braking (no assists!)
+# Smooth steering: car turns gradually like real car (not instant snapping)
+# ============================================================================
 car:
-  width: 30  # Smaller car for easier maneuvering
-  height: 15  # Smaller car
-  max_velocity: 50.0  # Maximum speed (auto-adjusted based on turns/obstacles)
-  min_velocity: -1.0  # Slower reverse
-  acceleration: 0.25  # Acceleration rate (auto speed control uses this)
-  friction: 0.95  # Friction (auto speed control manages braking)
-  turn_rate: 0.08  # Smooth turning for realistic steering
-  angular_damping: 0.85  # Damping for smooth steering (0.0=instant, 1.0=no damping)
-  # Note: Pure self-learning mode - NO intelligent assists!
-  # Agent learns EVERYTHING: steering, speed control, braking
-  # Smooth steering: car turns gradually like real car (not instant snapping)
+  # Dimensions
+  width: 30      # Car width in pixels (smaller = easier maneuvering)
+  height: 15     # Car height in pixels
 
-# Sensors
+  # Velocity limits
+  max_velocity: 50.0   # Maximum forward speed (pixels/frame)
+  min_velocity: -1.0   # Maximum reverse speed (slower backing)
+
+  # Dynamics
+  acceleration: 0.25   # Acceleration rate per frame
+  friction: 0.95       # Friction coefficient (0.0=no friction, 1.0=no slowdown)
+  turn_rate: 0.08      # Angular velocity change per frame (radians)
+  angular_damping: 0.85  # Smooth steering damping (0.0=instant turn, 1.0=no damping)
+
+# ============================================================================
+# SENSORS (Ray-casting for obstacle detection)
+# ============================================================================
 sensors:
-  num_sensors: 7
-  angles: [-90, -60, -30, 0, 30, 60, 90]  # degrees relative to car heading
-  max_range: 350  # pixels
-  render_rays: true
+  num_sensors: 7    # Number of ray-cast sensors
+  angles: [-90, -60, -30, 0, 30, 60, 90]  # Angles in degrees relative to car heading
+  max_range: 350    # Maximum detection range in pixels
+  render_rays: true # Visualize sensor rays during training
 
-# Rewards (optimized for learning - BALANCED!)
+# ============================================================================
+# REWARDS (Optimized and balanced for effective learning)
+# Additional reward shaping handled in simulation.py:
+#   - Wall proximity penalty (graduated based on distance)
+#   - Turning rewards when sensors detect danger
+#   - Center of track bonus
+#   - Speed bonus (only when safe)
+#   - Distance traveled reward
+# ============================================================================
 rewards:
-  survival: 2.0  # Increased from 1.0 to balance penalties
-  checkpoint: 500.0  # Increased from 100.0 - BIG reward for progress!
-  crash: -2000.0  # Increased penalty for crash
-  finish: 1000.0  # Base reward for completing the lap
-  # Reward shaping now handled in simulation.py:
-  # - Wall proximity penalty (BALANCED - not too extreme)
-  # - Red sensor turning rewards (clear but proportional)
-  # - Center of track bonus
-  # - Speed bonus (only when safe)
-  # - Distance traveled reward
+  survival: 2.0      # Per-step reward for staying alive (encourages longer episodes)
+  checkpoint: 500.0  # Large reward for reaching checkpoints (main progress signal)
+  crash: -2000.0     # Penalty for crashing (strong negative signal)
+  finish: 1000.0     # Bonus for completing full lap
 
-# Finish time bonus (encourages faster lap times)
+# ============================================================================
+# FINISH TIME BONUS (Encourages faster lap completion)
+# ============================================================================
 finish_time:
-  enabled: true  # Enable/disable time-based rewards
-  mode: "speed_based"  # "speed_based" or "target_based"
+  enabled: true           # Enable/disable time-based rewards
+  mode: "speed_based"     # Mode: "speed_based" or "target_based"
 
-  # SPEED_BASED MODE (recommended): Semakin cepat = semakin banyak reward
-  # Formula: reward = (max_time - actual_time) × multiplier
-  # Example: max=60s, finish di 25s → bonus = (60-25)×50 = 1750
-  max_time: 80.0  # Maximum expected time (slowest acceptable finish)
-  speed_multiplier: 30.0  # Reward per second saved
+  # ----------------------------------------------------------------------------
+  # SPEED_BASED MODE (Recommended)
+  # Faster finish = more reward
+  # Formula: reward = (max_time - actual_time) × speed_multiplier
+  # Example: max=80s, finish in 25s → bonus = (80-25) × 30 = 1650
+  # ----------------------------------------------------------------------------
+  max_time: 80.0          # Maximum expected lap time in seconds (baseline)
+  speed_multiplier: 30.0  # Reward per second saved below max_time
 
-  # TARGET_BASED MODE: Ada target ideal, lebih cepat=bonus, lebih lambat=penalty
-  # Formula: if time<target → +(target-time)×bonus_mult, else → -(time-target)×penalty_mult
-  target_time: 30.0  # Target lap time in seconds
-  bonus_multiplier: 50.0  # Bonus for finishing under target
-  penalty_multiplier: 10.0  # Penalty for finishing over target
+  # ----------------------------------------------------------------------------
+  # TARGET_BASED MODE (Alternative)
+  # Has target time: faster=bonus, slower=penalty
+  # Formula: if time < target → +(target-time) × bonus_mult
+  #          else            → -(time-target) × penalty_mult
+  # ----------------------------------------------------------------------------
+  target_time: 30.0       # Target lap time in seconds (ideal finish time)
+  bonus_multiplier: 50.0  # Bonus per second under target
+  penalty_multiplier: 10.0  # Penalty per second over target
 
-# Episode settings
+# ============================================================================
+# EPISODE SETTINGS
+# ============================================================================
 episode:
-  max_steps: 5000
-  start_position: [150, 250]
-  start_angle: 0  # radians
+  max_steps: 5000           # Maximum steps per episode before timeout
+  start_position: [150, 250]  # Default start position [x, y] in pixels
+  start_angle: 0            # Starting angle in radians (0 = facing right)
 
-# Rendering
+# ============================================================================
+# RENDERING (Visualization settings)
+# ============================================================================
 rendering:
-  show_sensors: true
-  show_checkpoints: true
-  show_info_panel: true
-  trail_length: 50  # Show last N positions
-  show_trail: true  # Show position trail
-  trail_color: [100, 100, 255]  # RGB color for trail
-  sensor_color: [0, 255, 0]  # Green for sensors
-  sensor_hit_color: [255, 0, 0]  # Red when sensor detects wall
+  show_sensors: true        # Display sensor rays
+  show_checkpoints: true    # Display checkpoint lines
+  show_info_panel: true     # Display episode info overlay
+  show_trail: true          # Display car's movement trail
+  trail_length: 50          # Number of previous positions to show
+  trail_color: [100, 100, 255]     # RGB color for trail (blue)
+  sensor_color: [0, 255, 0]        # RGB color for sensor rays (green)
+  sensor_hit_color: [255, 0, 0]    # RGB color when sensor hits wall (red)
 
-# Physics (timing)
+# ============================================================================
+# PHYSICS (Simulation timing and realism)
+# ============================================================================
 physics:
-  dt: 0.016  # Time step (1/60 seconds at 60 FPS)
-  use_realistic_physics: true  # Use realistic car physics vs arcade
+  dt: 0.016               # Time step in seconds (1/60 for 60 FPS)
+  use_realistic_physics: true  # Use realistic car physics vs arcade-style
 
-# State space configuration
+# ============================================================================
+# STATE SPACE (What the agent observes)
+# State vector = [sensor_1, ..., sensor_7, velocity]
+# - Sensors: normalized distance readings [0, 1] (0=max range, 1=touching wall)
+# - Velocity: normalized speed [0, 1] based on min/max velocity
+# Total state dimension: 8 (7 sensors + 1 velocity)
+# ============================================================================
 state:
-  # State vector = [sensor_1, ..., sensor_N, velocity]
-  # Sensors are normalized to [0, 1]
-  # Velocity is normalized to [0, 1] based on min/max velocity
-  normalize_state: true
-  include_position: false  # If true, add x, y to state (for debugging)
-  include_angle: false  # If true, add angle to state
+  normalize_state: true     # Normalize all state values to [0, 1]
+  include_position: false   # Add (x, y) to state (for debugging only)
+  include_angle: false      # Add heading angle to state (for debugging only)
 
-# Action space (9 discrete actions = 3 steering × 3 speed)
+# ============================================================================
+# ACTION SPACE (What the agent can do)
+# 9 discrete actions = 3 steering directions × 3 speed levels
+# Agent learns when to turn, how much, and what speed to use
+# ============================================================================
 actions:
-  type: "discrete"  # "discrete" or "continuous"
-  num_actions: 9
+  type: "discrete"    # Action type: "discrete" or "continuous"
+  num_actions: 9      # Total number of discrete actions
+
+  # Action mapping (3 steering × 3 speed = 9 combinations)
   discrete_actions:
-    - "LEFT_SLOW"       # 0: Turn left + slow speed
-    - "LEFT_NORMAL"     # 1: Turn left + normal speed
-    - "LEFT_FAST"       # 2: Turn left + fast speed
-    - "STRAIGHT_SLOW"   # 3: Go straight + slow speed
-    - "STRAIGHT_NORMAL" # 4: Go straight + normal speed
-    - "STRAIGHT_FAST"   # 5: Go straight + fast speed
+    - "LEFT_SLOW"       # 0: Turn left  + slow speed
+    - "LEFT_NORMAL"     # 1: Turn left  + normal speed
+    - "LEFT_FAST"       # 2: Turn left  + fast speed
+    - "STRAIGHT_SLOW"   # 3: Straight   + slow speed
+    - "STRAIGHT_NORMAL" # 4: Straight   + normal speed
+    - "STRAIGHT_FAST"   # 5: Straight   + fast speed
     - "RIGHT_SLOW"      # 6: Turn right + slow speed
     - "RIGHT_NORMAL"    # 7: Turn right + normal speed
     - "RIGHT_FAST"      # 8: Turn right + fast speed
