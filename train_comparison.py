@@ -31,12 +31,6 @@ def main():
         description="Side-by-side comparison training: DQN vs PPO"
     )
     parser.add_argument(
-        "--config",
-        type=str,
-        default="config/comparison_config.yaml",
-        help="Path to comparison config file",
-    )
-    parser.add_argument(
         "--track",
         type=str,
         default=None,
@@ -67,12 +61,13 @@ def main():
     args = parser.parse_args()
 
     # Load configuration
-    config = load_config(args.config)
+    modes_config = load_config("config/training_modes.yaml")
+    config = modes_config['comparison']  # Comparison mode config
 
     # Override config with command-line args
-    track_path = args.track if args.track else config['general']['track']
-    num_episodes = args.episodes if args.episodes else config['general']['num_episodes']
-    fps = args.fps if args.fps else config['general']['fps']
+    track_path = args.track if args.track else config['track']
+    num_episodes = args.episodes if args.episodes else config['num_episodes']
+    fps = args.fps if args.fps else config.get('fps', 60)
     enable_viz = not args.no_viz and config['visualization']['enabled']
 
     # Set multiprocessing start method for Mac compatibility
@@ -102,7 +97,7 @@ def main():
         agent2_config=config['agent2']['config'],
         track_path=track_path,
         num_episodes=num_episodes,
-        render_update_freq=config['general']['render_update_freq'],
+        render_update_freq=config.get('render_update_freq', 5),
     )
 
     # Create metrics collector

@@ -85,7 +85,9 @@ def train_with_ghost_comparison(
     print("=" * 70)
 
     # Load config
-    config = load_config("config/dqn_config.yaml")
+    modes_config = load_config("config/training_modes.yaml")
+    mode = modes_config['dqn_ghost']  # Ghost mode config
+    shared = modes_config['shared']   # Shared config
     env_config = load_config("config/environment.yaml")
 
     # Create environment with car physics AND rewards from environment.yaml
@@ -93,7 +95,7 @@ def train_with_ghost_comparison(
     env = CarEnvironment(
         track_path=track_path,
         render_mode="human",
-        max_steps=config['training']['max_steps_per_episode'],
+        max_steps=shared['training']['max_steps_per_episode'],
         car_width=env_config['car']['width'],
         car_height=env_config['car']['height'],
         car_max_velocity=env_config['car']['max_velocity'],
@@ -111,6 +113,7 @@ def train_with_ghost_comparison(
 
     print(f"✓ Track: {env.track.name}")
     print(f"✓ FPS: {fps}")
+    print(f"✓ Mode: {mode['name']}")
 
     # Create ghost renderer
     ghost_renderer = GhostRenderer(env.screen, env.car.width, env.car.height)
@@ -118,19 +121,19 @@ def train_with_ghost_comparison(
     # Create agent
     print("\n🤖 Creating DQN agent...")
     agent = DQNAgent(
-        state_dim=config['network']['state_dim'],
-        action_dim=config['network']['action_dim'],
-        hidden_dims=config['network']['hidden_dims'],
-        learning_rate=config['training']['learning_rate'],
-        gamma=config['training']['gamma'],
-        epsilon_start=config['exploration']['epsilon_start'],
-        epsilon_end=config['exploration']['epsilon_end'],
-        epsilon_decay=config['exploration']['epsilon_decay'],
-        buffer_capacity=config['replay']['buffer_size'],
-        batch_size=config['training']['batch_size'],
-        target_update_freq=config['target_network']['update_freq'],
-        device=config['training'].get('device'),
-        double_dqn=config['training'].get('double_dqn', False),
+        state_dim=shared['network']['state_dim'],
+        action_dim=shared['network']['action_dim'],
+        hidden_dims=shared['network']['hidden_dims'],
+        learning_rate=shared['training']['learning_rate'],
+        gamma=shared['training']['gamma'],
+        epsilon_start=mode['exploration']['epsilon_start'],
+        epsilon_end=mode['exploration']['epsilon_end'],
+        epsilon_decay=mode['exploration']['epsilon_decay'],
+        buffer_capacity=shared['replay']['buffer_size'],
+        batch_size=shared['training']['batch_size'],
+        target_update_freq=shared['target_network']['update_freq'],
+        device=shared['training'].get('device'),
+        double_dqn=shared['training'].get('double_dqn', False),
     )
     print(f"✓ Device: {agent.device}")
 
@@ -147,7 +150,7 @@ def train_with_ghost_comparison(
 
     best_reward = -float('inf')
     best_length = 0
-    checkpoint_dir = Path(config['checkpoint']['save_dir'])
+    checkpoint_dir = Path(mode['checkpoint']['save_dir'])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     for episode in range(num_episodes):

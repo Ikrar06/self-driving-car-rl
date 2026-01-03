@@ -209,16 +209,10 @@ def evaluate_agent(
 def main():
     parser = argparse.ArgumentParser(description="Train PPO agent")
     parser.add_argument(
-        "--config",
-        type=str,
-        default="config/ppo_config.yaml",
-        help="Path to PPO config file",
-    )
-    parser.add_argument(
         "--track",
         type=str,
-        default="tracks/oval_easy.json",
-        help="Path to track file",
+        default=None,
+        help="Path to track file (overrides config)",
     )
     parser.add_argument(
         "--episodes",
@@ -235,28 +229,32 @@ def main():
     args = parser.parse_args()
 
     # Load configuration
-    config = load_config(args.config)
+    modes_config = load_config("config/training_modes.yaml")
+    mode = modes_config['ppo']  # PPO mode config
+
+    # Use track from args or config
+    track = args.track if args.track else mode['track']
 
     # Create environment
-    env = CarEnvironment(track_path=args.track, render_mode=None)
+    env = CarEnvironment(track_path=track, render_mode=None)
 
     # Create PPO agent
     agent = PPOAgent(
-        state_dim=config['network']['state_dim'],
-        action_dim=config['network']['action_dim'],
-        hidden_dims=config['network']['hidden_dims'],
-        learning_rate=config['training']['learning_rate'],
-        gamma=config['training']['gamma'],
-        gae_lambda=config['ppo']['gae_lambda'],
-        clip_epsilon=config['ppo']['clip_epsilon'],
-        value_coef=config['ppo']['value_coef'],
-        entropy_coef=config['ppo']['entropy_coef'],
-        max_grad_norm=config['ppo']['max_grad_norm'],
-        update_epochs=config['training']['update_epochs'],
-        batch_size=config['training']['batch_size'],
-        trajectory_length=config['training']['trajectory_length'],
-        device=config['training']['device'],
-        continuous_actions=config['network']['continuous_actions'],
+        state_dim=mode['network']['state_dim'],
+        action_dim=mode['network']['action_dim'],
+        hidden_dims=mode['network']['hidden_dims'],
+        learning_rate=mode['training']['learning_rate'],
+        gamma=mode['training']['gamma'],
+        gae_lambda=mode['ppo']['gae_lambda'],
+        clip_epsilon=mode['ppo']['clip_epsilon'],
+        value_coef=mode['ppo']['value_coef'],
+        entropy_coef=mode['ppo']['entropy_coef'],
+        max_grad_norm=mode['ppo']['max_grad_norm'],
+        update_epochs=mode['training']['update_epochs'],
+        batch_size=mode['training']['batch_size'],
+        trajectory_length=mode['training']['trajectory_length'],
+        device=mode['training']['device'],
+        continuous_actions=mode['network']['continuous_actions'],
     )
 
     # Resume from checkpoint if specified
@@ -265,14 +263,14 @@ def main():
         print(f"📂 Resumed from {args.resume}")
 
     # Create TensorBoard writer
-    tensorboard_dir = config['logging']['tensorboard_dir']
+    tensorboard_dir = mode['logging']['tensorboard_dir']
     writer = SummaryWriter(tensorboard_dir)
 
     # Get training parameters
-    num_episodes = args.episodes if args.episodes else config['training']['num_episodes']
-    save_freq = config['checkpoint']['save_freq']
-    eval_freq = config['evaluation']['eval_freq']
-    checkpoint_dir = config['checkpoint']['save_dir']
+    num_episodes = args.episodes if args.episodes else mode['training']['num_episodes']
+    save_freq = mode['checkpoint']['save_freq']
+    eval_freq = mode['evaluation']['eval_freq']
+    checkpoint_dir = mode['checkpoint']['save_dir']
 
     # Create checkpoint directory
     Path(checkpoint_dir).mkdir(parents=True, exist_ok=True)

@@ -340,7 +340,9 @@ def train_with_camera(
     print("=" * 70)
 
     # Load config
-    config = load_config("config/dqn_config.yaml")
+    modes_config = load_config("config/training_modes.yaml")
+    mode = modes_config['dqn_camera']  # Camera mode config
+    shared = modes_config['shared']   # Shared config
     env_config = load_config("config/environment.yaml")
 
     # Create environment
@@ -348,7 +350,7 @@ def train_with_camera(
     env = CarEnvironment(
         track_path=track_path,
         render_mode="human",
-        max_steps=config['training']['max_steps_per_episode'],
+        max_steps=shared['training']['max_steps_per_episode'],
         car_width=env_config['car']['width'],
         car_height=env_config['car']['height'],
         car_max_velocity=env_config['car']['max_velocity'],
@@ -371,30 +373,27 @@ def train_with_camera(
     # Create agent
     print("\n🤖 Creating DQN agent...")
 
-    # Get state and action dimensions from environment config
-    state_dim = get_state_dim_from_config(env_config)
-    action_dim = get_action_dim_from_config(env_config)
-
     agent = DQNAgent(
-        state_dim=state_dim,
-        action_dim=action_dim,
-        hidden_dims=config['network']['hidden_dims'],
-        learning_rate=config['training']['learning_rate'],
-        gamma=config['training']['gamma'],
-        epsilon_start=0.3,
-        epsilon_end=0.05,
-        epsilon_decay=0.995,
-        buffer_capacity=config['replay']['buffer_size'],
-        batch_size=config['training']['batch_size'],
-        target_update_freq=config['target_network']['update_freq'],
-        device=config['training'].get('device'),
-        double_dqn=config['training'].get('double_dqn', False),
+        state_dim=shared['network']['state_dim'],
+        action_dim=shared['network']['action_dim'],
+        hidden_dims=shared['network']['hidden_dims'],
+        learning_rate=shared['training']['learning_rate'],
+        gamma=shared['training']['gamma'],
+        epsilon_start=mode['exploration']['epsilon_start'],  # From config: 0.3
+        epsilon_end=mode['exploration']['epsilon_end'],      # From config: 0.05
+        epsilon_decay=mode['exploration']['epsilon_decay'],  # From config: 0.995
+        buffer_capacity=shared['replay']['buffer_size'],
+        batch_size=shared['training']['batch_size'],
+        target_update_freq=shared['target_network']['update_freq'],
+        device=shared['training'].get('device'),
+        double_dqn=shared['training'].get('double_dqn', False),
     )
 
     print(f"✓ Track: {env.track.name}")
     print(f"✓ Car: {env.car.width}x{env.car.height}")
     print(f"✓ FPS: {fps}")
     print(f"✓ Camera: Zoom={camera.zoom}x, Follow={camera.follow_car}")
+    print(f"✓ Mode: {mode['name']}")
 
     print("\n" + "=" * 70)
     print("🚀 STARTING TRAINING")
@@ -403,7 +402,7 @@ def train_with_camera(
     best_reward = -float('inf')
     best_length = 0
     best_finish_time = float('inf')  # Track fastest lap time
-    checkpoint_dir = Path(config['checkpoint']['save_dir'])
+    checkpoint_dir = Path(mode['checkpoint']['save_dir'])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
     for episode in range(num_episodes):

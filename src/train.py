@@ -194,16 +194,10 @@ def evaluate_agent(
 def main():
     parser = argparse.ArgumentParser(description="Train DQN agent")
     parser.add_argument(
-        "--config",
-        type=str,
-        default="config/dqn_config.yaml",
-        help="Path to config file",
-    )
-    parser.add_argument(
         "--track",
         type=str,
-        default="tracks/oval_easy.json",
-        help="Path to track file",
+        default=None,
+        help="Path to track file (overrides config)",
     )
     parser.add_argument(
         "--episodes",
@@ -219,39 +213,45 @@ def main():
     args = parser.parse_args()
 
     # Load config
-    config = load_config(args.config)
+    modes_config = load_config("config/training_modes.yaml")
+    mode = modes_config['dqn_standard']  # Standard DQN mode
+    shared = modes_config['shared']
+    env_config = load_config("config/environment.yaml")
+
+    # Use track from args or config
+    track = args.track if args.track else mode['track']
 
     # Create environment
     render_mode = "human" if args.render else None
     env = CarEnvironment(
-        track_path=args.track,
+        track_path=track,
         render_mode=render_mode,
-        max_steps=config['training']['max_steps_per_episode'],
+        max_steps=shared['training']['max_steps_per_episode'],
     )
 
     # Create agent
     agent = DQNAgent(
-        state_dim=config['network']['state_dim'],
-        action_dim=config['network']['action_dim'],
-        hidden_dims=config['network']['hidden_dims'],
-        learning_rate=config['training']['learning_rate'],
-        gamma=config['training']['gamma'],
-        epsilon_start=config['exploration']['epsilon_start'],
-        epsilon_end=config['exploration']['epsilon_end'],
-        epsilon_decay=config['exploration']['epsilon_decay'],
-        buffer_capacity=config['replay']['buffer_size'],
-        batch_size=config['training']['batch_size'],
-        target_update_freq=config['target_network']['update_freq'],
-        device=config['training'].get('device'),
-        double_dqn=config['training'].get('double_dqn', False),
+        state_dim=shared['network']['state_dim'],
+        action_dim=shared['network']['action_dim'],
+        hidden_dims=shared['network']['hidden_dims'],
+        learning_rate=shared['training']['learning_rate'],
+        gamma=shared['training']['gamma'],
+        epsilon_start=mode['exploration']['epsilon_start'],
+        epsilon_end=mode['exploration']['epsilon_end'],
+        epsilon_decay=mode['exploration']['epsilon_decay'],
+        buffer_capacity=shared['replay']['buffer_size'],
+        batch_size=shared['training']['batch_size'],
+        target_update_freq=shared['target_network']['update_freq'],
+        device=shared['training'].get('device'),
+        double_dqn=shared['training'].get('double_dqn', False),
     )
 
     # TensorBoard writer
-    log_dir = config['logging']['tensorboard_dir']
+    log_dir = mode['logging']['tensorboard_dir']
     writer = SummaryWriter(log_dir)
 
     # Number of episodes
-    num_episodes = args.episodes or config['training']['num_episodes']
+    num_episodes = args.episodes or mode['training']['num_episodes']
 
     # Train
     train(
@@ -259,9 +259,9 @@ def main():
         agent=agent,
         num_episodes=num_episodes,
         writer=writer,
-        save_freq=config['checkpoint']['save_freq'],
-        eval_freq=config['evaluation']['eval_freq'],
-        checkpoint_dir=config['checkpoint']['save_dir'],
+        save_freq=mode['checkpoint']['save_freq'],
+        eval_freq=mode['evaluation']['eval_freq'],
+        checkpoint_dir=mode['checkpoint']['save_dir'],
     )
 
     # Cleanup
