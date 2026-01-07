@@ -6,15 +6,61 @@ Create tracks visually with mouse clicks!
 import pygame
 import json
 import math
+import subprocess
+import sys
 from pathlib import Path
 
-# Try to import tkinter for file dialog, fallback to text menu if not available
-try:
-    from tkinter import Tk, filedialog
-    TKINTER_AVAILABLE = True
-except ImportError:
-    TKINTER_AVAILABLE = False
-    print("⚠️  tkinter not available - will use text-based track selection")
+# Check if we can use native file dialogs
+NATIVE_DIALOG_AVAILABLE = sys.platform == 'darwin'  # macOS supports osascript
+if not NATIVE_DIALOG_AVAILABLE:
+    print("⚠️  Native file dialog not available - will use text-based track selection")
+
+
+def show_native_file_picker(initial_dir):
+    """
+    Show native macOS file picker using osascript (AppleScript).
+    This avoids tkinter conflicts with pygame/SDL.
+
+    Returns:
+        str: Selected file path, or None if cancelled
+    """
+    if not NATIVE_DIALOG_AVAILABLE:
+        return None
+
+    # AppleScript to show file picker
+    # Note: Removed "of type" filter to allow all JSON files to be visible
+    applescript = f'''
+    tell application "System Events"
+        activate
+        set theFile to choose file with prompt "Select Track to Load (.json)" default location POSIX file "{initial_dir}"
+        return POSIX path of theFile
+    end tell
+    '''
+
+    try:
+        result = subprocess.run(
+            ['osascript', '-e', applescript],
+            capture_output=True,
+            text=True,
+            timeout=60  # 60 second timeout
+        )
+
+        if result.returncode == 0:
+            # Success - return the file path (strip newline)
+            filepath = result.stdout.strip()
+
+            # Validate it's a JSON file
+            if not filepath.lower().endswith('.json'):
+                print(f"⚠️  Selected file is not a JSON file: {filepath}")
+                return None
+
+            return filepath
+        else:
+            # User cancelled or error
+            return None
+    except Exception as e:
+        print(f"⚠️  Error showing file picker: {e}")
+        return None
 
 
 class TrackBuilder:
@@ -522,30 +568,16 @@ class TrackBuilder:
         return filename
 
     def load_track(self):
-        """Load existing track for editing using file dialog or text menu."""
+        """Load existing track for editing using native file dialog or text menu."""
         tracks_dir = Path('tracks').absolute()
         tracks_dir.mkdir(exist_ok=True)
 
         filepath = None
 
-        if TKINTER_AVAILABLE:
-            # Use GUI file dialog
-            root = Tk()
-            root.withdraw()  # Hide the main window
-            root.attributes('-topmost', True)  # Bring dialog to front
-
-            # Open file dialog
-            filepath = filedialog.askopenfilename(
-                title="Select Track to Load",
-                initialdir=str(tracks_dir),
-                filetypes=[
-                    ("JSON Track Files", "*.json"),
-                    ("All Files", "*.*")
-                ]
-            )
-
-            # Destroy the Tk root
-            root.destroy()
+        if NATIVE_DIALOG_AVAILABLE:
+            # Use native macOS file picker (no pygame/SDL conflict!)
+            print("📂 Opening native file picker...")
+            filepath = show_native_file_picker(str(tracks_dir))
 
             # Check if user cancelled
             if not filepath:
